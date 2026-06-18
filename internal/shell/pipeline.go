@@ -770,6 +770,12 @@ func (s *Shell) execCommand(cmd command) int {
 		return s.execTrash(cmd.args[1:])
 	case "undo":
 		return s.execUndo(cmd.args[1:])
+	case "source":
+		if len(cmd.args) < 2 {
+			fmt.Fprintf(os.Stderr, "source: usage: source <file> [args...]\n")
+			return 1
+		}
+		return s.sourceScript(cmd.args[1], cmd.args[2:])
 	case "confirm":
 		return s.execConfirm(cmd.args[1:])
 	case "from-json", "from-csv", "to-json", "to-csv", "where", "sort-by", "select", "first", "last", "count", "uniq":
@@ -808,6 +814,7 @@ var builtins = map[string]string{
 	"confirm":   "prompt for confirmation, exits 0 for yes, 1 otherwise",
 	"trash":     "move files to trash (~/.zencr/trash/)",
 	"undo":      "restore the previous table state",
+	"source":    "execute commands from a file",
 	"from-json": "parse JSON into structured data",
 	"from-csv":  "parse CSV into structured data",
 	"to-json":   "convert structured data to JSON",

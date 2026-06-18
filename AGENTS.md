@@ -174,6 +174,18 @@ plugins/                     — Lua plugin scripts
 | `confirm [message]` | Prompt yes/no, exits 0 for yes |
 | `trash <file...>` | Move files to ~/.zencr/trash/ |
 | `undo` | Restore previous table state |
+| `source <file> [args...]` | Execute commands from a script file |
+
+### Scripting & control flow
+- Scripts support `if`/`else`/`end`, `for var in items`/`end`, `while cond`/`end` blocks
+- Conditions: `[ -f file ]`, `[ -d dir ]`, `[ -e path ]`, `[ a = b ]`, `[ a != b ]`, `[ a -eq b ]`, `[ a -lt b ]`, `[ a -gt b ]`
+- Negation: `! command` / `! [ cond ]`
+- Positional args: `$1`, `$2`, ..., `$9`, `$0` (script name), `$#` (arg count)
+- Variable assignment: `name=value` (sets environment variable)
+- Comments: lines starting with `#`
+- Source a script: `source script.bsh [arg1 arg2 ...]`
+- `for var in ...` loop iterates over space-delimited items
+- `while cond ... end` loops while condition is true
 
 ### Pipeline files
 - `internal/shell/pipeline.go` — `command` struct with `isData` flag, data handlers, `execDataPipeline`

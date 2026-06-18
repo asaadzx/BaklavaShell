@@ -543,3 +543,158 @@ func TestIsDataBuiltinNew(t *testing.T) {
 		}
 	}
 }
+
+func TestParseScriptSimple(t *testing.T) {
+	lines := []string{"echo hello", "echo world"}
+	blocks := parseScript(lines)
+	if len(blocks) != 2 {
+		t.Fatalf("expected 2 blocks, got %d", len(blocks))
+	}
+	if blocks[0].kind != "cmd" || blocks[1].kind != "cmd" {
+		t.Errorf("expected both cmds, got %s %s", blocks[0].kind, blocks[1].kind)
+	}
+}
+
+func TestParseScriptIfBlock(t *testing.T) {
+	lines := []string{"if true", "  echo yes", "end"}
+	blocks := parseScript(lines)
+	if len(blocks) != 1 {
+		t.Fatalf("expected 1 block, got %d", len(blocks))
+	}
+	if blocks[0].kind != "if" {
+		t.Errorf("expected if block, got %s", blocks[0].kind)
+	}
+	if len(blocks[0].body) != 1 {
+		t.Errorf("expected 1 body line, got %d", len(blocks[0].body))
+	}
+}
+
+func TestParseScriptIfElse(t *testing.T) {
+	lines := []string{"if false", "  echo yes", "else", "  echo no", "end"}
+	blocks := parseScript(lines)
+	if len(blocks) != 1 {
+		t.Fatalf("expected 1 block, got %d", len(blocks))
+	}
+	if len(blocks[0].elseBody) != 1 {
+		t.Errorf("expected 1 else body line, got %d", len(blocks[0].elseBody))
+	}
+}
+
+func TestParseScriptForBlock(t *testing.T) {
+	lines := []string{"for i in a b c", "  echo $i", "end"}
+	blocks := parseScript(lines)
+	if len(blocks) != 1 {
+		t.Fatalf("expected 1 block, got %d", len(blocks))
+	}
+	if blocks[0].kind != "for" {
+		t.Errorf("expected for block, got %s", blocks[0].kind)
+	}
+}
+
+func TestParseScriptWhileBlock(t *testing.T) {
+	lines := []string{"while true", "  echo looping", "end"}
+	blocks := parseScript(lines)
+	if len(blocks) != 1 {
+		t.Fatalf("expected 1 block, got %d", len(blocks))
+	}
+	if blocks[0].kind != "while" {
+		t.Errorf("expected while block, got %s", blocks[0].kind)
+	}
+}
+
+func TestParseForSimple(t *testing.T) {
+	varName, items := parseFor("for i in a b c")
+	if varName != "i" {
+		t.Errorf("expected var i, got %s", varName)
+	}
+	if len(items) != 3 || items[0] != "a" || items[1] != "b" || items[2] != "c" {
+		t.Errorf("expected [a b c], got %v", items)
+	}
+}
+
+func TestEvalTestFileExists(t *testing.T) {
+	s := &Shell{}
+	result := s.evalTest("-f /etc/passwd")
+	if !result {
+		t.Errorf("expected /etc/passwd to exist as file")
+	}
+}
+
+func TestEvalTestDirExists(t *testing.T) {
+	s := &Shell{}
+	result := s.evalTest("-d /tmp")
+	if !result {
+		t.Errorf("expected /tmp to exist as dir")
+	}
+}
+
+func TestEvalTestNotExists(t *testing.T) {
+	s := &Shell{}
+	result := s.evalTest("-e /nonexistent_path_xyz")
+	if result {
+		t.Errorf("expected nonexistent path to not exist")
+	}
+}
+
+func TestEvalTestStringEq(t *testing.T) {
+	s := &Shell{}
+	result := s.evalTest("a = a")
+	if !result {
+		t.Errorf("expected a = a to be true")
+	}
+}
+
+func TestEvalTestStringNeq(t *testing.T) {
+	s := &Shell{}
+	result := s.evalTest("a != b")
+	if !result {
+		t.Errorf("expected a != b to be true")
+	}
+}
+
+func TestExtractCond(t *testing.T) {
+	cond := extractCond("if [ -f foo ]", "if")
+	if cond != "[ -f foo ]" {
+		t.Errorf("expected [ -f foo ], got %q", cond)
+	}
+}
+
+func TestBuiltinsMapUpdated(t *testing.T) {
+	if _, ok := builtins["source"]; !ok {
+		t.Errorf("builtins map missing source")
+	}
+	if _, ok := builtins["trash"]; !ok {
+		t.Errorf("builtins map missing trash")
+	}
+	if _, ok := builtins["undo"]; !ok {
+		t.Errorf("builtins map missing undo")
+	}
+}
+
+func TestParseScriptNestedIf(t *testing.T) {
+	lines := []string{
+		"if true",
+		"  if true",
+		"    echo inner",
+		"  end",
+		"end",
+	}
+	blocks := parseScript(lines)
+	if len(blocks) != 1 {
+		t.Fatalf("expected 1 top-level block, got %d", len(blocks))
+	}
+	if len(blocks[0].body) != 3 {
+		t.Errorf("expected 3 body lines, got %d: %#v", len(blocks[0].body), blocks[0].body)
+	}
+}
+
+func TestParseScriptComments(t *testing.T) {
+	lines := []string{"# this is a comment", "echo hi", "# another comment"}
+	blocks := parseScript(lines)
+	if len(blocks) != 1 {
+		t.Fatalf("expected 1 block, got %d", len(blocks))
+	}
+	if blocks[0].raw != "echo hi" {
+		t.Errorf("expected echo hi, got %q", blocks[0].raw)
+	}
+}
