@@ -535,6 +535,7 @@ func TestIsDataBuiltinNew(t *testing.T) {
 		{"last", true},
 		{"count", true},
 		{"uniq", true},
+		{"table", true},
 		{"confirm", false},
 	}
 	for _, tt := range tests {
@@ -696,5 +697,27 @@ func TestParseScriptComments(t *testing.T) {
 	}
 	if blocks[0].raw != "echo hi" {
 		t.Errorf("expected echo hi, got %q", blocks[0].raw)
+	}
+}
+
+func TestHandleTable(t *testing.T) {
+	s := &Shell{}
+	input := `[{"name":"alice","age":30}]`
+	stdin := strings.NewReader(input)
+	out, code := s.handleTable(nil, stdin)
+	if code != 0 {
+		t.Fatalf("handleTable exit code %d", code)
+	}
+	if out != input {
+		t.Errorf("expected passthrough, got %q", out)
+	}
+}
+
+func TestHandleTableInvalid(t *testing.T) {
+	s := &Shell{}
+	stdin := strings.NewReader("not json")
+	_, code := s.handleTable(nil, stdin)
+	if code == 0 {
+		t.Errorf("expected non-zero exit for invalid json")
 	}
 }

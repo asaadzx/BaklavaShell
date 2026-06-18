@@ -220,7 +220,7 @@ var builtinNames = map[string]bool{
 	"confirm": true, "trash": true, "undo": true, "source": true,
 	"from-json": true, "from-csv": true, "to-json": true, "to-csv": true,
 	"where": true, "sort-by": true, "select": true,
-	"first": true, "last": true, "count": true, "uniq": true,
+	"first": true, "last": true, "count": true, "uniq": true, "table": true,
 }
 
 func (s *Shell) expandAliases(tokens []string) []string {

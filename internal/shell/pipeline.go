@@ -30,7 +30,7 @@ type command struct {
 func isDataBuiltin(name string) bool {
 	switch name {
 	case "where", "sort-by", "select", "from-json", "from-csv", "to-json", "to-csv",
-		"first", "last", "count", "uniq", "sum", "avg", "min", "max":
+		"first", "last", "count", "uniq", "sum", "avg", "min", "max", "table":
 		return true
 	}
 	return false
@@ -61,6 +61,8 @@ func (s *Shell) getDataFn(name string) func(args []string, stdin io.Reader) (str
 		return s.handleCount
 	case "uniq":
 		return s.handleUniq
+	case "table":
+		return s.handleTable
 	}
 	return nil
 }
@@ -374,6 +376,20 @@ func (s *Shell) handleUniq(args []string, stdin io.Reader) (string, int) {
 		return "", 1
 	}
 	return json, 0
+}
+
+func (s *Shell) handleTable(args []string, stdin io.Reader) (string, int) {
+	b, err := io.ReadAll(stdin)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "table: %v\n", err)
+		return "", 1
+	}
+	// Validate JSON, then pass through
+	if _, err := data.FromJSON(string(b)); err != nil {
+		fmt.Fprintf(os.Stderr, "table: %v\n", err)
+		return "", 1
+	}
+	return string(b), 0
 }
 
 // parseSegment splits tokens at | to build a pipeline,
@@ -778,7 +794,7 @@ func (s *Shell) execCommand(cmd command) int {
 		return s.sourceScript(cmd.args[1], cmd.args[2:])
 	case "confirm":
 		return s.execConfirm(cmd.args[1:])
-	case "from-json", "from-csv", "to-json", "to-csv", "where", "sort-by", "select", "first", "last", "count", "uniq":
+	case "from-json", "from-csv", "to-json", "to-csv", "where", "sort-by", "select", "first", "last", "count", "uniq", "table":
 		fn := s.getDataFn(cmd.args[0])
 		if fn == nil {
 			fmt.Fprintf(os.Stderr, "%s: internal error\n", cmd.args[0])
@@ -826,6 +842,7 @@ var builtins = map[string]string{
 	"last":      "show last N rows (default 10)",
 	"count":     "count rows, or count by groups with `count field`",
 	"uniq":      "show unique rows",
+	"table":     "display JSON as a formatted table",
 }
 
 func (s *Shell) execCD(args []string) int {
