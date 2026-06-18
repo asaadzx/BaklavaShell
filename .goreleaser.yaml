@@ -47,14 +47,22 @@ snapshot:
 changelog:
   use: github
   groups:
-    - title: Features
+    - title: "🚀 Features"
       regexp: '^.*?feat(\([^)]*\))?[!:]'
       order: 0
-    - title: Bug fixes
+    - title: "🐛 Bug fixes"
       regexp: '^.*?fix(\([^)]*\))?[!:]'
       order: 1
-    - title: Maintenance
+    - title: "📖 Documentation"
+      regexp: '^.*?docs(\([^)]*\))?[!:]'
       order: 2
+    - title: "🧹 Maintenance"
+      order: 3
+  filters:
+    exclude:
+      - '^docs:'
+      - '^ci:'
+      - typo
 
 release:
   draft: true
