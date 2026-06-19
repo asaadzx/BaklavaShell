@@ -288,3 +288,50 @@ func TestGetPromptReturnsNonNilFallback(t *testing.T) {
 		t.Errorf("expected empty when no prompt fn, got %q", got)
 	}
 }
+
+func TestGetSuggestion(t *testing.T) {
+	m := New()
+	defer m.Close()
+
+	// No plugin loaded → empty
+	if got := m.GetSuggestion("ec"); got != "" {
+		t.Errorf("expected empty with no plugin, got %q", got)
+	}
+
+	// Load a plugin with get_suggestion
+	code := `
+		local history = {"echo hello", "exit", "export PATH=/usr/bin"}
+		function get_suggestion(line)
+			for _, cmd in ipairs(history) do
+				if cmd:sub(1, #line) == line then
+					return cmd:sub(#line + 1)
+				end
+			end
+			return ""
+		end
+	`
+	if err := m.L.DoString(code); err != nil {
+		t.Fatal(err)
+	}
+	m.LoadPlugins("", nil) // caches hook from the Lua state
+
+	// "ec" should match "echo hello" → suggest "ho hello"
+	if got := m.GetSuggestion("ec"); got != "ho hello" {
+		t.Errorf("expected 'ho hello' for 'ec', got %q", got)
+	}
+
+	// "exit" should match → suggest "" (full match)
+	if got := m.GetSuggestion("exit"); got != "" {
+		t.Errorf("expected '' for 'exit', got %q", got)
+	}
+
+	// "zzz" should match nothing
+	if got := m.GetSuggestion("zzz"); got != "" {
+		t.Errorf("expected '' for 'zzz', got %q", got)
+	}
+
+	// Empty line → first history entry (all commands start with "")
+	if got := m.GetSuggestion(""); got != "echo hello" {
+		t.Errorf("expected 'echo hello' for empty, got %q", got)
+	}
+}

@@ -15,7 +15,7 @@ The old C++ code has been removed. This is a pure Go project.
 - **Prompt theming**: `prompt.go` — `hex_to_ansi` + `strings.ReplaceAll` for `%u`, `%h`, `%d` (no regex)
 - **History**: automatically managed by `chzyer/readline` → `~/.bshc/history`
 - **Input**: `chzyer/readline` — arrow key history, line editing, EOF/^C handling
-- **Plugin hooks** (only these 3 are called by the shell): `execute_command(args)` → bool, `get_prompt()` → string, `set_exit_code(code)`
+- **Plugin hooks** (only these 4 are called by the shell): `execute_command(args)` → bool, `get_prompt()` → string, `set_exit_code(code)`, `get_suggestion(line)` → string
 
 ## Build & run
 

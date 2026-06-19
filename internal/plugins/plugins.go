@@ -1,10 +1,11 @@
 // Package plugins manages Lua plugin scripts for BakShell.
 //
 // Plugins are loaded from ~/.bshc/plugins/*.lua. Each plugin can define
-// up to three global functions that the shell calls:
+// any of these global functions that the shell calls:
 //   - execute_command(args) — return true to claim the command, false to pass through
 //   - get_prompt() — return a string to override the prompt
 //   - set_exit_code(code) — called after every command with its exit code
+//   - get_suggestion(line) — return a completion suffix for inline autosuggest
 package plugins
 
 import (
@@ -23,6 +24,7 @@ type Manager struct {
 	L        *lua.LState
 	execFn   *lua.LFunction // cached execute_command, or nil
 	promptFn *lua.LFunction // cached get_prompt, or nil
+	suggestFn *lua.LFunction // cached get_suggestion, or nil
 }
 
 // New creates a plugin manager with a fresh Lua VM.
@@ -45,33 +47,34 @@ func (m *Manager) LoadConfig(path string) (*config.Config, error) {
 }
 
 // LoadPlugins reads the plugin directory and runs each active .lua file.
-// After loading, it caches the execute_command and get_prompt globals if set.
+// After loading, it caches plugin hooks from the Lua state.
 func (m *Manager) LoadPlugins(pluginDir string, active []string) {
-	entries, err := os.ReadDir(pluginDir)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Warning: could not read plugins directory: %v\n", err)
-		return
-	}
+	if pluginDir != "" {
+		entries, err := os.ReadDir(pluginDir)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: could not read plugins directory: %v\n", err)
+		} else {
+			activeSet := make(map[string]bool, len(active))
+			for _, p := range active {
+				activeSet[p] = true
+			}
 
-	activeSet := make(map[string]bool, len(active))
-	for _, p := range active {
-		activeSet[p] = true
-	}
+			for _, entry := range entries {
+				if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".lua") {
+					continue
+				}
+				if !activeSet[entry.Name()] {
+					continue
+				}
 
-	for _, entry := range entries {
-		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".lua") {
-			continue
+				path := filepath.Join(pluginDir, entry.Name())
+				if err := m.L.DoFile(path); err != nil {
+					fmt.Fprintf(os.Stderr, "Error loading plugin %s: %v\n", entry.Name(), err)
+					continue
+				}
+				fmt.Printf("Loaded plugin: %s\n", entry.Name())
+			}
 		}
-		if !activeSet[entry.Name()] {
-			continue
-		}
-
-		path := filepath.Join(pluginDir, entry.Name())
-		if err := m.L.DoFile(path); err != nil {
-			fmt.Fprintf(os.Stderr, "Error loading plugin %s: %v\n", entry.Name(), err)
-			continue
-		}
-		fmt.Printf("Loaded plugin: %s\n", entry.Name())
 	}
 
 	// Cache plugin hooks — only the last plugin's definitions take effect
@@ -83,6 +86,11 @@ func (m *Manager) LoadPlugins(pluginDir string, active []string) {
 	if fn := m.L.GetGlobal("get_prompt"); fn != lua.LNil {
 		if f, ok := fn.(*lua.LFunction); ok {
 			m.promptFn = f
+		}
+	}
+	if fn := m.L.GetGlobal("get_suggestion"); fn != lua.LNil {
+		if f, ok := fn.(*lua.LFunction); ok {
+			m.suggestFn = f
 		}
 	}
 }
@@ -147,4 +155,25 @@ func (m *Manager) SetExitCode(code int) {
 		return
 	}
 	_ = m.L.CallByParam(lua.P{Fn: fn, NRet: 0, Protect: true}, lua.LNumber(code))
+}
+
+// GetSuggestion calls the cached get_suggestion hook with the current line
+// and returns the suggested completion text. Returns "" if no suggestion.
+func (m *Manager) GetSuggestion(line string) string {
+	if m.suggestFn == nil {
+		return ""
+	}
+	if err := m.L.CallByParam(lua.P{
+		Fn:      m.suggestFn,
+		NRet:    1,
+		Protect: true,
+	}, lua.LString(line)); err != nil {
+		return ""
+	}
+	ret := m.L.Get(-1)
+	m.L.Pop(1)
+	if s, ok := ret.(lua.LString); ok {
+		return string(s)
+	}
+	return ""
 }

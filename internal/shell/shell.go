@@ -19,7 +19,7 @@ import (
 )
 
 // Shell holds the persistent state for the shell session: config, plugins,
-// environment info, aliases, and the undo buffer.
+// environment info, aliases, the undo buffer, and the current inline suggestion.
 type Shell struct {
 	home        string
 	cfg         *config.Config
@@ -30,6 +30,9 @@ type Shell struct {
 	lastExit    int
 	aliases     map[string]string
 	undoTable   *data.TableValue // saved table state for the 'undo' command
+
+	suggestion         string // current inline suggestion suffix
+	suggestionFor      string // the line for which the suggestion was computed
 }
 
 // New initializes the shell: determines the user/home, creates ~/.bshc/
@@ -94,6 +97,8 @@ func (s *Shell) Run() int {
 		HistoryFile:       s.home + "/.bshc/history",
 		HistoryLimit:      histSize,
 		AutoComplete:      s,
+		Listener:          s,
+		Painter:           s,
 		InterruptPrompt:   "^C",
 		EOFPrompt:         "exit",
 		HistorySearchFold: true,
@@ -215,6 +220,94 @@ func (s *Shell) execute(args []string) {
 	}
 
 	s.plugins.SetExitCode(s.lastExit)
+}
+
+// OnChange implements readline.Listener for inline suggestions.
+// It recomputes the suggestion on each keystroke and accepts the
+// suggestion when the right arrow key (CharForward) is pressed at
+// the end of the line.
+func (s *Shell) OnChange(line []rune, pos int, key rune) (newLine []rune, newPos int, ok bool) {
+	// Accept suggestion on right arrow at end of line
+	if key == readline.CharForward && pos == len(line) && s.suggestion != "" {
+		sug := []rune(s.suggestion)
+		newLine = make([]rune, len(line)+len(sug))
+		copy(newLine, line)
+		copy(newLine[len(line):], sug)
+		s.suggestion = ""
+		return newLine, len(newLine), true
+	}
+	// Recompute suggestion on every meaningful keystroke
+	if key != 0 {
+		s.suggestion = s.plugins.GetSuggestion(string(line))
+		if s.suggestion != "" {
+			s.suggestionFor = string(line)
+		} else {
+			s.suggestionFor = ""
+		}
+	} else {
+		s.suggestion = ""
+		s.suggestionFor = ""
+	}
+	// Force a re-render so Paint can display the suggestion dimmed
+	// (WriteRune's internal Refresh runs before the Listener is called)
+	if s.suggestion != "" {
+		return line, pos, true
+	}
+	return line, pos, false
+}
+
+// Paint implements readline.Painter for displaying inline suggestions.
+// When the cursor is at the end of the line and a suggestion exists
+// that matches the current input, the suggestion is rendered dimmed.
+func (s *Shell) Paint(line []rune, pos int) []rune {
+	if s.suggestion == "" || pos != len(line) {
+		return line
+	}
+	// Discard stale suggestion: the current line + suggestion must still
+	// produce the same full command as when it was computed
+	fullLine := string(line)
+	if fullLine+s.suggestion != s.suggestionFor+s.suggestion {
+		return line
+	}
+	sug := []rune(s.suggestion)
+	// Build: line + ESC[2m + suggestion + ESC[0m + cursor-back by sug width
+	out := make([]rune, 0, len(line)+len(sug)+12)
+	out = append(out, line...)
+	out = append(out, '\033', '[', '2', 'm')
+	out = append(out, sug...)
+	out = append(out, '\033', '[', '0', 'm')
+	w := runeWidth(sug)
+	for i := 0; i < w; i++ {
+		out = append(out, '\b')
+	}
+	return out
+}
+
+// runeWidth returns the monospace display width of runes.
+func runeWidth(r []rune) int {
+	// For ASCII and common Unicode, the display width is len(r) for
+	// simple characters. We approximate: each rune <= 0x7F is width 1,
+	// CJK range gets width 2, everything else 1.
+	n := 0
+	for _, c := range r {
+		if c >= 0x1100 && (c <= 0x115F || c == 0x2329 || c == 0x232A ||
+			(c >= 0x2E80 && c <= 0xA4CF) ||
+			(c >= 0xAC00 && c <= 0xD7AF) ||
+			(c >= 0xF900 && c <= 0xFAFF) ||
+			(c >= 0xFE10 && c <= 0xFE19) ||
+			(c >= 0xFE30 && c <= 0xFE6F) ||
+			(c >= 0xFF01 && c <= 0xFF60) ||
+			(c >= 0xFFE0 && c <= 0xFFE6) ||
+			(c >= 0x1B000 && c <= 0x1B0FF) ||
+			(c >= 0x1D300 && c <= 0x1D35F) ||
+			(c >= 0x20000 && c <= 0x2A6DF) ||
+			(c >= 0x2F800 && c <= 0x2FA1F)) {
+			n += 2
+		} else {
+			n++
+		}
+	}
+	return n
 }
 
 // isOperator reports whether a token is a shell control operator.

@@ -80,7 +80,7 @@ settings = {
 
 ## Plugins
 
-Lua scripts in `~/.bshc/plugins/` can hook into three entrypoints:
+Lua scripts in `~/.bshc/plugins/` can hook into four entrypoints:
 
 ```lua
 function execute_command(args)
@@ -98,6 +98,17 @@ end
 function set_exit_code(code)
     -- called after every command with the exit code
 end
+
+function get_suggestion(line)
+    -- called on every keystroke; return a completion suffix
+    -- from history for inline autosuggest (shown dimmed on screen)
+    for _, cmd in ipairs(history) do
+        if cmd:sub(1, #line) == line then
+            return cmd:sub(#line + 1)
+        end
+    end
+    return ""
+end
 ```
 
 ### Included plugins
@@ -106,7 +117,7 @@ end
 |--------|-------------|
 | `aquia-prompt.lua` | Two-line prompt with git, exit code, Aquia palette |
 | `git-prompt.lua` | Git branch + status in prompt |
-| `autosuggest.lua` | History-based command suggestions |
+| `autosuggest.lua` | History-based inline suggestions via `get_suggestion` hook |
 | `powerlevel10k.lua` | Full-featured p10k-style prompt theme |
 | `venv-prompt.lua` | Python virtualenv/conda indicator |
 | `node-version.lua` | Node.js version from `.nvmrc`/`.node-version` |
@@ -132,7 +143,7 @@ end
 
 ### High priority
 - [x] **Branding**: logo assets and screenshot added to README
-- [ ] **Suggestion plugin**: wire up `get_suggestion` hook in Go for inline suggestions
+- [x] **Suggestion plugin**: wire up `get_suggestion` hook in Go for inline suggestions
 
 ### Medium priority
 - [x] **Cleanup**: removed duplicate `ghost-prompt.lua` (identical to `powerlevel10k.lua`)
