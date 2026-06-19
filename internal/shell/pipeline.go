@@ -786,6 +786,8 @@ func (s *Shell) execCommand(cmd command) int {
 		return s.execTrash(cmd.args[1:])
 	case "undo":
 		return s.execUndo(cmd.args[1:])
+	case "banner":
+		return s.execBanner(cmd.args[1:])
 	case "source":
 		if len(cmd.args) < 2 {
 			fmt.Fprintf(os.Stderr, "source: usage: source <file> [args...]\n")
@@ -830,6 +832,7 @@ var builtins = map[string]string{
 	"confirm":   "prompt for confirmation, exits 0 for yes, 1 otherwise",
 	"trash":     "move files to trash (~/.bshc/trash/)",
 	"undo":      "restore the previous table state",
+	"banner":    "display the Baklava Shell ASCII art banner",
 	"source":    "execute commands from a file",
 	"from-json": "parse JSON into structured data",
 	"from-csv":  "parse CSV into structured data",
@@ -870,6 +873,18 @@ func (s *Shell) execEcho(args []string) int {
 	} else {
 		fmt.Println(out)
 	}
+	return 0
+}
+
+const bannerArt = "" +
+	" ____        _    _                    ____  _          _ _ \n" +
+	"| __ )  __ _| | _| | __ ___   ____ _  / ___|| |__   ___| | |\n" +
+	"|  _ \\ / _` | |/ / |/ _` \\ \\ / / _` | \\___ \\| '_ \\ / _ \\ | |\n" +
+	"| |_) | (_| |   <| | (_| |\\ V / (_| |  ___) | | | |  __/ | |\n" +
+	"|____/ \\__,_|_|\\_\\_|\\__,_| \\_/ \\__,_| |____/|_| |_|\\___|_|_|\n"
+
+func (s *Shell) execBanner(args []string) int {
+	fmt.Print(bannerArt)
 	return 0
 }
 

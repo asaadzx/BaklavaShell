@@ -1,13 +1,28 @@
-# 🐚 BakShell
+<p align="center">
+  <img src="docs/logo/BaklavaShellLogo.png" alt="Baklava Shell" width="300"/>
+</p>
 
-> **Ba**klava **Sh**ell — a blazing-fast, customizable shell with Lua plugin support, rewritten in Go.
+<p align="center">
+  <em>Ba</em>klava <em>Sh</em>ell — like layered phyllo, every command is a layer of perfection.
+</p>
 
-![Go version](https://img.shields.io/badge/Go-1.21+-00ADD8?logo=go)
-![License](https://img.shields.io/badge/license-MIT-green)
-![Build](https://img.shields.io/badge/build-static-brightgreen)
-[![GoDoc](https://img.shields.io/badge/go-doc-blue)](https://pkg.go.dev/github.com/anomalyco/zenshell)
+<p align="center">
+  <img src="https://img.shields.io/badge/Go-1.21+-00ADD8?logo=go" alt="Go version"/>
+  <img src="https://img.shields.io/badge/license-MIT-green" alt="License"/>
+  <img src="https://img.shields.io/badge/build-static-brightgreen" alt="Build"/>
+  <img src="https://img.shields.io/badge/baklava-sweet-ff69b4" alt="Baklava"/>
+</p>
 
-Single static binary, ~3MB stripped. No runtime deps (no libreadline, no liblua).
+<p align="center">
+  A blazing-fast, customizable shell with Lua plugin support — rewritten in Go from the original C++ Zen Shell.<br/>
+  Single static binary, ~3 MB stripped. No libreadline, no liblua, no CGo.
+</p>
+
+<p align="center">
+  <img src="docs/logo/screenshot.png" alt="BakShell screenshot" width="80%"/>
+</p>
+
+---
 
 ## Quickstart
 
@@ -18,14 +33,20 @@ go build -ldflags="-s -w" -o bsh ./cmd/bsh
 
 ## Features
 
-- **Lua config** — theme colors, prompt format, plugin selection at `~/.bshc/config.lua`
-- **Lua plugins** — overload `execute_command`, `get_prompt`, `set_exit_code` from Lua scripts
-- **Aquia theme** — beautiful two-line prompt with git status, exit code, and Aquia color palette
-- **Readline input** — arrow-key history, line editing, history persistence
-- **Fully static** — no libreadline / liblua / CGo, no system library dependencies
-- **Builtins**: `cd`, `exit`, `echo`, `pwd`, `type`, `export`, `unset`, `history`, `alias`, `unalias`, `help`
-- **Data pipeline**: `from-json`, `from-csv`, `to-json`, `to-csv`, `where`, `sort-by`, `select`, `first`, `last`, `count`, `uniq`, `confirm`, `trash`, `undo`
-- **Scripting**: `if`/`else`/`end`, `for`/`end`, `while`/`end`, `source`, `[ cond ]` tests
+| Category | What you get |
+|----------|-------------|
+| **Lua config** | Theme colors, prompt format, plugin selection at `~/.bshc/config.lua` |
+| **Lua plugins** | Hook into `execute_command`, `get_prompt`, `set_exit_code` from Lua |
+| **Prompt theming** | Aquia theme with git status, exit code, rich color palette — or build your own |
+| **Readline input** | Arrow-key history, line editing, persistent `~/.bshc/history` |
+| **Fully static** | Zero runtime deps. No libreadline, no liblua, no CGo. Just a binary. |
+| **Builtins** | `cd`, `exit`, `echo`, `pwd`, `type`, `export`, `unset`, `history`, `alias`, `unalias`, `help`, `banner` |
+| **Data pipeline** | `from-json`, `from-csv`, `to-json`, `to-csv`, `where`, `sort-by`, `select`, `first`, `last`, `count`, `uniq`, `confirm`, `trash`, `undo` |
+| **Scripting** | `if`/`else`/`end`, `for`/`end`, `while`/`end`, `source`, `[ cond ]` tests, variables |
+| **Tab completion** | PATH-aware command completion + filesystem path completion |
+| **Command timing** | Auto-timed commands (dimmed duration for anything >100 ms) |
+| **Aliases** | `alias name=value` with recursive expansion |
+| **Multi-line input** | Continuation prompts for unclosed quotes and `\` continuations |
 
 ## Configuration
 
@@ -48,19 +69,26 @@ settings = {
 }
 ```
 
-`%u` → user, `%h` → hostname, `%d` → cwd (with `~` for home).
+| Specifier | Expands to |
+|-----------|------------|
+| `%u` | Username |
+| `%h` | Hostname |
+| `%d` | Current directory (with `~` for home) |
+| `%t` / `%T` | Time (HH:MM / HH:MM:SS) |
+| `%?` | Last exit code |
+| `%$` | `#` for root, `$` otherwise |
 
 ## Plugins
 
-Lua scripts in `~/.bshc/plugins/`. Each plugin can define:
+Lua scripts in `~/.bshc/plugins/` can hook into three entrypoints:
 
 ```lua
 function execute_command(args)
     if args[1] == "hello" then
         print("Hello, World!")
-        return true  -- command handled
+        return true  -- handled, don't pass to shell
     end
-    return false     -- pass to shell
+    return false     -- not handled, pass to shell
 end
 
 function get_prompt()
@@ -103,18 +131,18 @@ end
 ## Roadmap / TODO
 
 ### High priority
-- [ ] **Branding**: create logo assets, add screenshots to README
-- [ ] **Suggestion plugin**: wire up `get_suggestion` hook in Go so shell can surface inline suggestions
+- [x] **Branding**: logo assets and screenshot added to README
+- [ ] **Suggestion plugin**: wire up `get_suggestion` hook in Go for inline suggestions
 
 ### Medium priority
 - [x] **Cleanup**: removed duplicate `ghost-prompt.lua` (identical to `powerlevel10k.lua`)
 - [x] **Document `.bshc`**: directory layout documented above
 - [x] **Plugin dev guide**: included in README
-- [x] **Refactor plugins**: removed dead hooks (`get_prompt_suffix`, `on_command_entered`, `on_shutdown`, `on_command_complete`) not called by the shell
+- [x] **Refactor plugins**: removed dead hooks not called by the shell
 
 ### Low priority
 - [ ] **New plugins**: fzf integration, zoxide-style dir nav, weather, motd
-- [x] **Test coverage**: added tests for config, plugins, and cmd/bsh packages
+- [x] **Test coverage**: tests for config, plugins, and cmd/bsh packages
 
 ## Development
 
