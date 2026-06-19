@@ -5,6 +5,14 @@ import (
 	"strings"
 )
 
+// tokenize splits a command line into tokens, handling:
+//   - Single/double quotes with $VAR expansion in double quotes
+//   - Backslash escapes
+//   - Shell metacharacters (; | & > <) as separate tokens
+//   - Multi-char operators (&&, ||, >>, &>, &>>)
+//   - ~ expansion at token start
+//   - $VAR and ${VAR} expansion via os.Getenv
+//   - Newlines as whitespace
 func tokenize(input string) []string {
 	var tokens []string
 	var cur strings.Builder
@@ -119,6 +127,9 @@ func tokenize(input string) []string {
 	return tokens
 }
 
+// expandVar handles $VAR and ${VAR} expansion. It reads the variable name
+// starting at *i, advances *i past it, and returns the value (or empty string
+// if unset). A lone $ is returned literally.
 func expandVar(input string, i *int) string {
 	start := *i
 	if *i >= len(input) {
@@ -156,9 +167,9 @@ func isAlphaNum(ch byte) bool {
 	return (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9')
 }
 
-// needsContinuation checks if the line has unclosed quotes or a continuation char.
+// needsContinuation checks if a line ends with unclosed quotes or a trailing
+// backslash, indicating that more input is expected.
 func needsContinuation(line string) bool {
-	// Check for trailing unescaped backslash
 	if strings.HasSuffix(line, "\\") && !strings.HasSuffix(line, "\\\\") {
 		return true
 	}

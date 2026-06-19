@@ -6,7 +6,7 @@
 --   todo rm <n>           - remove todo #n
 --   todo clear            - remove all completed
 
-local DATA_FILE = os.getenv("HOME") .. "/.zencr/todos.json"
+local DATA_FILE = os.getenv("HOME") .. "/.bshc/todos.json"
 
 local todos = {}
 

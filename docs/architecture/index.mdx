@@ -5,9 +5,9 @@
 ```
 cmd/bsh/main.go
   └─ shell.New()
-       ├── os.MkdirAll → ~/.zencr/, ~/.zencr/plugins/
+       ├── os.MkdirAll → ~/.bshc/, ~/.bshc/plugins/
        ├── plugins.New() → lua.LState
-       ├── plugins.LoadConfig() → parse ~/.zencr/config.lua
+       ├── plugins.LoadConfig() → parse ~/.bshc/config.lua
        └── plugins.LoadPlugins() → run Lua scripts, cache functions
   └─ shell.Run()
        ├── readline.NewEx() → line editor with history
@@ -48,7 +48,7 @@ The config-based prompt uses `strings.ReplaceAll` for `%u`, `%h`, `%d` instead o
 
 ### Readline auto-persistence
 
-`chzyer/readline` writes each line to the history file as it's entered. No manual `Save()`/`Load()` calls needed. The file path is `~/.zencr/history`.
+`chzyer/readline` writes each line to the history file as it's entered. No manual `Save()`/`Load()` calls needed. The file path is `~/.bshc/history`.
 
 ## Exit code flow
 

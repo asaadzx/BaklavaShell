@@ -10,11 +10,12 @@ The old C++ code has been removed. This is a pure Go project.
 
 - **Module**: `bakshell` (root package `main`)
 - **Entrypoint**: `main.go` → `Shell.Run()` in `shell.go`
-- **Config**: `~/.zencr/config.lua` — parsed via `gopher-lua` into `Config` struct
-- **Plugins**: Lua scripts in `~/.zencr/plugins/` — `execute_command(args)` and `get_prompt()` entrypoints cached at load time
+- **Config**: `~/.bshc/config.lua` — parsed via `gopher-lua` into `Config` struct
+- **Plugins**: Lua scripts in `~/.bshc/plugins/` — `execute_command(args)` and `get_prompt()` entrypoints cached at load time
 - **Prompt theming**: `prompt.go` — `hex_to_ansi` + `strings.ReplaceAll` for `%u`, `%h`, `%d` (no regex)
-- **History**: automatically managed by `chzyer/readline` → `~/.zencr/history`
+- **History**: automatically managed by `chzyer/readline` → `~/.bshc/history`
 - **Input**: `chzyer/readline` — arrow key history, line editing, EOF/^C handling
+- **Plugin hooks** (only these 3 are called by the shell): `execute_command(args)` → bool, `get_prompt()` → string, `set_exit_code(code)`
 
 ## Build & run
 
@@ -172,7 +173,7 @@ plugins/                     — Lua plugin scripts
 | `count [field...]` | Count rows, or count by groups |
 | `uniq [field...]` | Show unique rows |
 | `confirm [message]` | Prompt yes/no, exits 0 for yes |
-| `trash <file...>` | Move files to ~/.zencr/trash/ |
+| `trash <file...>` | Move files to ~/.bshc/trash/ |
 | `undo` | Restore previous table state |
 | `source <file> [args...]` | Execute commands from a script file |
 

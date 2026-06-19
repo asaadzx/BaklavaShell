@@ -1,5 +1,5 @@
 -- Random developer quote plugin
--- Shows a random programming quote in the prompt
+-- Shows a random programming quote beneath the prompt
 
 local ESC = "\27["
 local RESET = ESC .. "0m"
@@ -17,7 +17,6 @@ local quotes = {
   "Debugging is twice as hard as writing the code. — B. Kernighan",
   "The best code is no code at all. — J. Raskin",
   "Code is like humor. When you have to explain it, it's bad. — C. Hunt",
-  "Software entropy never decreases. — W. Humphrey",
   "There are only two hard things: cache invalidation and naming things. — P. Karlton",
   "It works on my machine. — Every developer",
   "A language that doesn't affect the way you think about programming is not worth knowing. — A. Perlis",
@@ -37,21 +36,18 @@ local quotes = {
 local rng = math.random
 local last_idx = 0
 local quote_text = ""
-local rotate_every = 3  -- show same quote for N prompts
-
+local rotate_every = 3
 local counter = 0
 
-function get_prompt_suffix()
+function get_prompt()
   counter = counter + 1
   if counter % rotate_every == 1 or quote_text == "" then
     local idx = rng(#quotes)
-    if idx == last_idx then
-      idx = idx % #quotes + 1
-    end
+    if idx == last_idx then idx = idx % #quotes + 1 end
     last_idx = idx
     quote_text = quotes[idx]
   end
-  return DIM .. ITALIC .. quote_text .. RESET
+  return DIM .. ITALIC .. quote_text .. RESET .. "\n$ "
 end
 
 function execute_command(args)

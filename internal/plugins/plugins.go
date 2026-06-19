@@ -1,3 +1,10 @@
+// Package plugins manages Lua plugin scripts for BakShell.
+//
+// Plugins are loaded from ~/.bshc/plugins/*.lua. Each plugin can define
+// up to three global functions that the shell calls:
+//   - execute_command(args) — return true to claim the command, false to pass through
+//   - get_prompt() — return a string to override the prompt
+//   - set_exit_code(code) — called after every command with its exit code
 package plugins
 
 import (
@@ -11,20 +18,24 @@ import (
 	lua "github.com/yuin/gopher-lua"
 )
 
+// Manager owns the Lua VM and caches references to active plugin hooks.
 type Manager struct {
 	L        *lua.LState
-	execFn   *lua.LFunction
-	promptFn *lua.LFunction
+	execFn   *lua.LFunction // cached execute_command, or nil
+	promptFn *lua.LFunction // cached get_prompt, or nil
 }
 
+// New creates a plugin manager with a fresh Lua VM.
 func New() *Manager {
 	return &Manager{L: lua.NewState()}
 }
 
+// Close shuts down the Lua VM.
 func (m *Manager) Close() {
 	m.L.Close()
 }
 
+// LoadConfig delegates to config.LoadFromLua using the internal Lua state.
 func (m *Manager) LoadConfig(path string) (*config.Config, error) {
 	cfg, err := config.LoadFromLua(m.L, path)
 	if err != nil {
@@ -33,6 +44,8 @@ func (m *Manager) LoadConfig(path string) (*config.Config, error) {
 	return cfg, nil
 }
 
+// LoadPlugins reads the plugin directory and runs each active .lua file.
+// After loading, it caches the execute_command and get_prompt globals if set.
 func (m *Manager) LoadPlugins(pluginDir string, active []string) {
 	entries, err := os.ReadDir(pluginDir)
 	if err != nil {
@@ -61,6 +74,7 @@ func (m *Manager) LoadPlugins(pluginDir string, active []string) {
 		fmt.Printf("Loaded plugin: %s\n", entry.Name())
 	}
 
+	// Cache plugin hooks — only the last plugin's definitions take effect
 	if fn := m.L.GetGlobal("execute_command"); fn != lua.LNil {
 		if f, ok := fn.(*lua.LFunction); ok {
 			m.execFn = f
@@ -73,6 +87,8 @@ func (m *Manager) LoadPlugins(pluginDir string, active []string) {
 	}
 }
 
+// ExecuteCommand calls the cached execute_command hook with args as a Lua table.
+// Returns true if the plugin claimed the command.
 func (m *Manager) ExecuteCommand(args []string) bool {
 	if m.execFn == nil {
 		return false
@@ -97,6 +113,8 @@ func (m *Manager) ExecuteCommand(args []string) bool {
 	return ret == lua.LTrue
 }
 
+// GetPrompt calls the cached get_prompt hook and returns its string result.
+// Returns "" if no plugin sets get_prompt or if it errors.
 func (m *Manager) GetPrompt() string {
 	if m.promptFn == nil {
 		return ""
@@ -118,6 +136,8 @@ func (m *Manager) GetPrompt() string {
 	return ""
 }
 
+// SetExitCode calls the cached set_exit_code hook with the given code.
+// It is safe to call even if no plugin defines set_exit_code.
 func (m *Manager) SetExitCode(code int) {
 	var fn *lua.LFunction
 	if v := m.L.GetGlobal("set_exit_code"); v != lua.LNil {

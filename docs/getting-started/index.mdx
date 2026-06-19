@@ -29,7 +29,7 @@ Flags:
 ./bsh
 ```
 
-On first run it creates `~/.zencr/` and `~/.zencr/plugins/` automatically. The shell works immediately with baked-in defaults — no config file required.
+On first run it creates `~/.bshc/` and `~/.bshc/plugins/` automatically. The shell works immediately with baked-in defaults — no config file required.
 
 ## Verify
 
@@ -49,9 +49,9 @@ hello world
 To customize, copy the example files:
 
 ```sh
-mkdir -p ~/.zencr/plugins
-cp config.lua ~/.zencr/config.lua
-cp plugins/*.lua ~/.zencr/plugins/
+mkdir -p ~/.bshc/plugins
+cp config.lua ~/.bshc/config.lua
+cp plugins/*.lua ~/.bshc/plugins/
 ```
 
 Restart the shell to pick up changes.

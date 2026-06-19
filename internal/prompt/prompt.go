@@ -1,3 +1,14 @@
+// Package prompt formats prompt strings using the theme config.
+//
+// Supported prompt specifiers:
+//
+//	%u — username
+//	%h — hostname
+//	%d — current directory (~ for home)
+//	%t — current time (HH:MM)
+//	%T — current time (HH:MM:SS)
+//	%? — last exit code
+//	%$ — "#" for root, "$" for normal users
 package prompt
 
 import (
@@ -7,6 +18,8 @@ import (
 	"time"
 )
 
+// HexToANSI converts a hex color string (e.g. "#4287f5") to an ANSI 24-bit
+// foreground escape sequence. Returns reset code on invalid input.
 func HexToANSI(hex string) string {
 	h := strings.TrimPrefix(hex, "#")
 	if len(h) != 6 {
@@ -20,6 +33,8 @@ func HexToANSI(hex string) string {
 	return fmt.Sprintf("\033[38;2;%d;%d;%dm", r, g, b)
 }
 
+// Format replaces specifiers in format with their runtime values and wraps
+// the result in the given color. Uses strings.ReplaceAll (no regex in hot path).
 func Format(format, user, host, cwd, colorHex string, lastExit int) string {
 	if format == "" {
 		format = "[%u@%h %d]$ "

@@ -1,6 +1,6 @@
 # Configuration
 
-BakShell reads `~/.zencr/config.lua` on startup. This is a standard Lua file that returns global tables — no `return` statement needed, just assign to globals.
+BakShell reads `~/.bshc/config.lua` on startup. This is a standard Lua file that returns global tables — no `return` statement needed, just assign to globals.
 
 ## Example
 
@@ -24,7 +24,7 @@ settings = {
 
 ## `plugins` table
 
-List of Lua plugin filenames to load from `~/.zencr/plugins/`.
+List of Lua plugin filenames to load from `~/.bshc/plugins/`.
 
 ```lua
 plugins = {
@@ -60,9 +60,9 @@ The format string is processed with `strings.ReplaceAll` — no regex overhead.
 
 | Field | Default | Description |
 |-------|---------|-------------|
-| `history_size` | `1000` | Maximum history lines written to `~/.zencr/history` |
+| `history_size` | `1000` | Maximum history lines written to `~/.bshc/history` |
 | `auto_complete` | `true` | Reserved for future tab-completion support |
 
 ## Config not found
 
-If `~/.zencr/config.lua` does not exist, the shell starts with defaults and prints a warning on stderr. To silence the warning, create the file or copy the example.
+If `~/.bshc/config.lua` does not exist, the shell starts with defaults and prints a warning on stderr. To silence the warning, create the file or copy the example.

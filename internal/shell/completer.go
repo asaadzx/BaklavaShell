@@ -8,13 +8,14 @@ import (
 	"sync"
 )
 
-// PATH cache — rebuilt when $PATH changes
+// PATH command completion cache, lazily built and refreshed when $PATH changes.
 var (
 	pathCache    []string
 	pathCacheVal string
 	pathCacheMu  sync.Mutex
 )
 
+// buildPathCache scans $PATH and caches all executable names for tab completion.
 func buildPathCache() {
 	dirs := filepath.SplitList(os.Getenv("PATH"))
 	seen := make(map[string]bool)
@@ -38,6 +39,7 @@ func buildPathCache() {
 	sort.Strings(pathCache)
 }
 
+// ensurePathCache rebuilds the path cache if PATH has changed since last build.
 func ensurePathCache() {
 	cur := os.Getenv("PATH")
 	pathCacheMu.Lock()
@@ -48,6 +50,10 @@ func ensurePathCache() {
 	}
 }
 
+// Do implements readline.AutoCompleter. It completes:
+//   - Command names (first word) from the PATH cache
+//   - File paths (subsequent words) by reading the filesystem
+// Directories get a trailing "/".
 func (s *Shell) Do(line []rune, pos int) ([][]rune, int) {
 	ensurePathCache()
 
@@ -62,7 +68,6 @@ func (s *Shell) Do(line []rune, pos int) ([][]rune, int) {
 	var candidates []string
 
 	if isFirstWord {
-		// Command completion from PATH cache
 		for _, cmd := range pathCache {
 			if strings.HasPrefix(cmd, prefix) {
 				candidates = append(candidates, cmd)
@@ -70,14 +75,12 @@ func (s *Shell) Do(line []rune, pos int) ([][]rune, int) {
 		}
 	}
 
-	// File completion (also for first-word to handle ./foo)
 	fileDir := filepath.Dir(prefix)
 	if fileDir == "." {
 		fileDir = ""
 	}
 	filePrefix := filepath.Base(prefix)
 
-	// Expand ~ in file paths
 	searchDir := fileDir
 	if strings.HasPrefix(searchDir, "~") {
 		searchDir = s.home + searchDir[1:]

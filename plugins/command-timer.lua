@@ -5,12 +5,8 @@ local ESC = "\27["
 local RESET = ESC .. "0m"
 local DIM = ESC .. "2m"
 
-local threshold_ms = 50    -- minimum time to show (milliseconds)
+local threshold_ms = 50
 local start_time = 0
-
-function set_exit_code(code)
-  -- no-op, we use execute_command to measure time
-end
 
 function execute_command(args)
   if #args == 0 then return false end
@@ -18,7 +14,7 @@ function execute_command(args)
   return false
 end
 
-function on_command_complete()
+function set_exit_code(code)
   if start_time == 0 then return end
   local elapsed = (os.clock() - start_time) * 1000
   start_time = 0

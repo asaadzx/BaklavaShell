@@ -4,10 +4,9 @@
 --   j <fragment>   - jump to most-used matching directory
 --   j add [dir]    - manually add directory to database
 
-local DATA_FILE = os.getenv("HOME") .. "/.zencr/jump.db"
+local DATA_FILE = os.getenv("HOME") .. "/.bshc/jump.db"
 local MAX_ENTRIES = 500
 
--- db: { dir -> { count, time } }
 local db = {}
 local dirty = false
 
@@ -16,9 +15,7 @@ local function load_db()
   if not f then return end
   for line in f:lines() do
     local dir, count, time = line:match("^([^\t]+)\t(%d+)\t(%d+)$")
-    if dir then
-      db[dir] = { count = tonumber(count), time = tonumber(time) }
-    end
+    if dir then db[dir] = { count = tonumber(count), time = tonumber(time) } end
   end
   f:close()
 end
@@ -31,10 +28,7 @@ local function save_db()
   end
   table.sort(lines)
   local f = io.open(DATA_FILE, "w")
-  if f then
-    f:write(table.concat(lines, "\n") .. "\n")
-    f:close()
-  end
+  if f then f:write(table.concat(lines, "\n") .. "\n"); f:close() end
   dirty = false
 end
 
@@ -42,23 +36,19 @@ local function add_dir(dir)
   if not dir or dir == "" then return end
   local info = db[dir]
   if info then
-    info.count = info.count + 1
-    info.time = os.time()
+    info.count = info.count + 1; info.time = os.time()
   else
     if #db >= MAX_ENTRIES then
-      -- Remove least recently used
       local oldest_dir, oldest_time
       for d, i in pairs(db) do
-        if not oldest_time or i.time < oldest_time then
-          oldest_dir = d
-          oldest_time = i.time
-        end
+        if not oldest_time or i.time < oldest_time then oldest_dir = d; oldest_time = i.time end
       end
       if oldest_dir then db[oldest_dir] = nil end
     end
     db[dir] = { count = 1, time = os.time() }
   end
   dirty = true
+  save_db()
 end
 
 local function score(info)
@@ -83,14 +73,10 @@ function execute_command(args)
   if #args == 0 then return false end
 
   if args[1] == "j" then
-    -- Record the directory we're coming from
     add_dir(io.popen("pwd"):read("*l") or "")
-
     if #args == 1 then
-      -- List all
       local matches = find_matches("")
-      if #matches == 0 then
-        print("jump: no directories in database")
+      if #matches == 0 then print("jump: no directories in database")
       else
         print("Most-used directories:")
         for i, m in ipairs(matches) do
@@ -100,30 +86,16 @@ function execute_command(args)
       end
       return true
     end
-
     local fragment = table.concat(args, " ", 2)
     local matches = find_matches(fragment)
-    if #matches == 0 then
-      io.stderr:write("jump: no matching directory\n")
-      return true
-    end
-
-    -- Change to best match
-    local target = matches[1].dir
-    os.execute("cd " .. target)    -- won't work; needs shell builtin
-    -- Instead, print the path for the shell to handle
-    print("cd " .. target)
+    if #matches == 0 then io.stderr:write("jump: no matching directory\n"); return true end
+    print("cd " .. matches[1].dir)
     return true
   end
 
-  -- Track cd commands
   if args[1] == "cd" and #args >= 2 then
     local target = args[2]
-    -- Expand ~
-    if target:sub(1, 1) == "~" then
-      target = os.getenv("HOME") .. target:sub(2)
-    end
-    -- If relative, resolve later
+    if target:sub(1, 1) == "~" then target = os.getenv("HOME") .. target:sub(2) end
     add_dir(target)
     return false
   end
@@ -131,15 +103,4 @@ function execute_command(args)
   return false
 end
 
--- Save on exit
-function on_shutdown()
-  save_db()
-end
-
--- Periodic flush
-local function auto_save()
-  save_db()
-end
-
--- Register auto-save timer (use execute_command as hook)
 print("Jump plugin loaded (" .. #db .. " entries)")

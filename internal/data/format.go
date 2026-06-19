@@ -32,6 +32,7 @@ func (t TableValue) ToJSON() (string, error) {
 	return string(data), nil
 }
 
+// valueToJSON converts a Value to an interface{} suitable for json.Marshal.
 func valueToJSON(v Value) interface{} {
 	switch val := v.(type) {
 	case StringValue:
@@ -54,6 +55,7 @@ func valueToJSON(v Value) interface{} {
 }
 
 // FromJSON parses a JSON array of objects into a TableValue.
+// Field types are inferred from JSON types.
 func FromJSON(s string) (TableValue, error) {
 	var rows []map[string]interface{}
 	if err := json.Unmarshal([]byte(s), &rows); err != nil {
@@ -64,7 +66,7 @@ func FromJSON(s string) (TableValue, error) {
 		return TableValue{}, nil
 	}
 
-	// Collect all columns preserving order from first row
+	// Collect columns in order of first appearance across all rows
 	colSet := make(map[string]bool)
 	var columns []string
 	for _, row := range rows {
@@ -90,12 +92,12 @@ func FromJSON(s string) (TableValue, error) {
 	return TableValue{Columns: columns, Rows: result}, nil
 }
 
+// jsonToValue recursively converts a decoded JSON value to a Value.
 func jsonToValue(raw interface{}) Value {
 	switch v := raw.(type) {
 	case string:
 		return StringValue{Value: v}
 	case float64:
-		// Check if it's actually an integer
 		if v == float64(int64(v)) {
 			return IntValue{Value: int64(v)}
 		}
@@ -121,9 +123,7 @@ func jsonToValue(raw interface{}) Value {
 	}
 }
 
-// --- CSV ---
-
-// ToCSV serializes a TableValue to CSV text.
+// ToCSV serializes a TableValue to CSV text (header + data rows).
 func (t TableValue) ToCSV() (string, error) {
 	var b strings.Builder
 	w := csv.NewWriter(&b)
@@ -153,7 +153,8 @@ func (t TableValue) ToCSV() (string, error) {
 	return b.String(), nil
 }
 
-// FromCSV parses CSV text into a TableValue.
+// FromCSV parses CSV text (first row = headers) into a TableValue.
+// Values are parsed as int/float where possible, else kept as strings.
 func FromCSV(s string) (TableValue, error) {
 	r := csv.NewReader(strings.NewReader(s))
 	records, err := r.ReadAll()
@@ -180,7 +181,7 @@ func FromCSV(s string) (TableValue, error) {
 	return TableValue{Columns: columns, Rows: rows}, nil
 }
 
-// parseNumberOrString attempts to parse a string as int or float, falling back to string.
+// parseNumberOrString tries int, then float, then falls back to string.
 func parseNumberOrString(s string) Value {
 	if s == "" {
 		return StringValue{Value: s}

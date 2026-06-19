@@ -828,7 +828,7 @@ var builtins = map[string]string{
 	"alias":     "define or display aliases",
 	"unalias":   "remove alias definitions",
 	"confirm":   "prompt for confirmation, exits 0 for yes, 1 otherwise",
-	"trash":     "move files to trash (~/.zencr/trash/)",
+	"trash":     "move files to trash (~/.bshc/trash/)",
 	"undo":      "restore the previous table state",
 	"source":    "execute commands from a file",
 	"from-json": "parse JSON into structured data",
@@ -927,7 +927,7 @@ func (s *Shell) execHistory(args []string) int {
 	// Handle -c flag (clear)
 	for _, a := range args {
 		if a == "-c" {
-			histPath := s.home + "/.zencr/history"
+			histPath := s.home + "/.bshc/history"
 			if err := os.WriteFile(histPath, []byte{}, 0644); err != nil {
 				fmt.Fprintf(os.Stderr, "history: %v\n", err)
 				return 1
@@ -945,7 +945,7 @@ func (s *Shell) execHistory(args []string) int {
 		}
 	}
 
-	histPath := s.home + "/.zencr/history"
+	histPath := s.home + "/.bshc/history"
 	data, err := os.ReadFile(histPath)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -1058,7 +1058,7 @@ func (s *Shell) execTrash(args []string) int {
 		fmt.Fprintf(os.Stderr, "trash: usage: trash <file> [file...]\n")
 		return 1
 	}
-	trashDir := s.home + "/.zencr/trash"
+	trashDir := s.home + "/.bshc/trash"
 	if err := os.MkdirAll(trashDir, 0755); err != nil {
 		fmt.Fprintf(os.Stderr, "trash: %v\n", err)
 		return 1

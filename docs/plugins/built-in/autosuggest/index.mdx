@@ -7,8 +7,6 @@ Fuzzy-matched command history with frequency tracking.
 | Function | Behavior |
 |----------|----------|
 | `execute_command(args)` | Handles the `suggest` command; logs every executed command to history |
-| `on_command_entered(cmd)` | Hook called after each command |
-| `get_suggestion(input)` | Returns the best match for partial input |
 
 ## Commands
 
@@ -30,4 +28,4 @@ Suggestions:
 - Uses Levenshtein distance for fuzzy matching (allows 2-character typos)
 - Exact prefix matches rank above fuzzy matches
 - Results are cached per input string to avoid recomputation
-- Writes to `~/.zencr/history` on each new command
+- Writes to `~/.bshc/history` on each new command

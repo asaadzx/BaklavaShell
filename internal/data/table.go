@@ -8,13 +8,15 @@ import (
 )
 
 // Condition represents a filter condition: field op value.
+// Parsed by ParseCondition from strings like "age > 30".
 type Condition struct {
 	Field string
 	Op    string // ==, !=, <, <=, >, >=, ~=, in
 	Value Value
 }
 
-// Filter returns rows where all conditions match.
+// Filter returns a new table with only rows matching all conditions.
+// Missing fields cause the row to be excluded (except for != where they pass).
 func (t TableValue) Filter(conds []Condition) (TableValue, error) {
 	if len(conds) == 0 {
 		return t, nil
@@ -25,12 +27,7 @@ func (t TableValue) Filter(conds []Condition) (TableValue, error) {
 		matches := true
 		for _, c := range conds {
 			val, ok := row.Fields[c.Field]
-			if !ok && c.Op != "!=" {
-				matches = false
-				break
-			}
 			if !ok {
-				// For !=, missing field means it's not equal
 				if c.Op == "!=" {
 					continue
 				}
@@ -53,16 +50,17 @@ func (t TableValue) Filter(conds []Condition) (TableValue, error) {
 	return TableValue{Columns: t.Columns, Rows: filtered}, nil
 }
 
-// LessFunc compares two rows for sorting. Returns true if a < b.
+// LessFunc compares two records for sorting.
 type LessFunc func(a, b RecordValue) bool
 
-// SortBy returns rows sorted by the given field and direction.
+// SortBy returns a new table sorted by the given field.
+// Set desc to true for descending order. Returns an error if the field
+// does not exist or if values can't be compared.
 func (t TableValue) SortBy(field string, desc bool) (TableValue, error) {
 	if len(t.Rows) == 0 {
 		return t, nil
 	}
 
-	// Verify field exists
 	found := false
 	for _, col := range t.Columns {
 		if col == field {
@@ -81,7 +79,6 @@ func (t TableValue) SortBy(field string, desc bool) (TableValue, error) {
 		a := sorted[i].Fields[field]
 		b := sorted[j].Fields[field]
 
-		// Compare as values
 		less, err := lessThan(a, b)
 		if err != nil {
 			return false
@@ -129,12 +126,12 @@ func valuesEqual(a, b Value) bool {
 }
 
 // Select returns a new table with only the given columns.
+// Returns an error if any column doesn't exist.
 func (t TableValue) Select(cols []string) (TableValue, error) {
 	if len(cols) == 0 {
 		return t, nil
 	}
 
-	// Verify all columns exist
 	for _, col := range cols {
 		found := false
 		for _, c := range t.Columns {
@@ -161,7 +158,7 @@ func (t TableValue) Select(cols []string) (TableValue, error) {
 	return TableValue{Columns: cols, Rows: rows}, nil
 }
 
-// First returns the first n rows.
+// First returns a new table with the first n rows.
 func (t TableValue) First(n int) TableValue {
 	if n <= 0 {
 		return TableValue{Columns: t.Columns}
@@ -174,7 +171,7 @@ func (t TableValue) First(n int) TableValue {
 	return TableValue{Columns: t.Columns, Rows: rows}
 }
 
-// Last returns the last n rows.
+// Last returns a new table with the last n rows.
 func (t TableValue) Last(n int) TableValue {
 	if n <= 0 {
 		return TableValue{Columns: t.Columns}
@@ -187,7 +184,7 @@ func (t TableValue) Last(n int) TableValue {
 	return TableValue{Columns: t.Columns, Rows: rows}
 }
 
-// Unique returns rows with unique values for the given set of fields.
+// Unique returns rows with unique combinations of the given fields.
 // If no fields are given, uses all columns.
 func (t TableValue) Unique(fields []string) TableValue {
 	if len(fields) == 0 {
@@ -214,9 +211,8 @@ func (t TableValue) Unique(fields []string) TableValue {
 	return TableValue{Columns: t.Columns, Rows: rows}
 }
 
-// GroupBy returns the table grouped by the given field(s),
-// with each group's row count as a new column.
-// Returns a table with group columns + count column.
+// GroupBy returns a table grouped by the given fields, with a "count" column
+// added. The result has one row per unique combination of group fields.
 func (t TableValue) GroupBy(fields []string) TableValue {
 	if len(fields) == 0 {
 		fields = t.Columns
@@ -268,20 +264,17 @@ func (t TableValue) GroupBy(fields []string) TableValue {
 	return TableValue{Columns: cols, Rows: rows}
 }
 
-// Aggregate performs an aggregation on a field.
-// Valid ops: sum, avg, min, max.
+// Aggregate performs an aggregation (sum, avg, min, max, count) on a numeric
+// field. Returns an error if the field has no numeric values.
 func (t TableValue) Aggregate(field, op string) (Value, error) {
 	if len(t.Rows) == 0 {
 		return nil, fmt.Errorf("aggregate on empty table")
 	}
 
-	// Collect numeric values
 	var nums []float64
 	for _, row := range t.Rows {
 		val, ok := row.Fields[field]
-		if !ok {
-			continue
-		}
+		if !ok { continue }
 		switch v := val.(type) {
 		case IntValue:
 			nums = append(nums, float64(v.Value))
@@ -299,40 +292,22 @@ func (t TableValue) Aggregate(field, op string) (Value, error) {
 		return IntValue{Value: int64(len(nums))}, nil
 	case "sum":
 		var total float64
-		for _, n := range nums {
-			total += n
-		}
-		if allInts(nums) {
-			return IntValue{Value: int64(total)}, nil
-		}
+		for _, n := range nums { total += n }
+		if allInts(nums) { return IntValue{Value: int64(total)}, nil }
 		return FloatValue{Value: total}, nil
 	case "avg":
 		var total float64
-		for _, n := range nums {
-			total += n
-		}
+		for _, n := range nums { total += n }
 		return FloatValue{Value: total / float64(len(nums))}, nil
 	case "min":
 		min := nums[0]
-		for _, n := range nums[1:] {
-			if n < min {
-				min = n
-			}
-		}
-		if allInts(nums) {
-			return IntValue{Value: int64(min)}, nil
-		}
+		for _, n := range nums[1:] { if n < min { min = n } }
+		if allInts(nums) { return IntValue{Value: int64(min)}, nil }
 		return FloatValue{Value: min}, nil
 	case "max":
 		max := nums[0]
-		for _, n := range nums[1:] {
-			if n > max {
-				max = n
-			}
-		}
-		if allInts(nums) {
-			return IntValue{Value: int64(max)}, nil
-		}
+		for _, n := range nums[1:] { if n > max { max = n } }
+		if allInts(nums) { return IntValue{Value: int64(max)}, nil }
 		return FloatValue{Value: max}, nil
 	default:
 		return nil, fmt.Errorf("unknown aggregate op %q", op)
@@ -341,14 +316,13 @@ func (t TableValue) Aggregate(field, op string) (Value, error) {
 
 func allInts(nums []float64) bool {
 	for _, n := range nums {
-		if n != float64(int64(n)) {
-			return false
-		}
+		if n != float64(int64(n)) { return false }
 	}
 	return true
 }
 
-// ParseCondition parses a condition string like "cpu > 20" or "name == foo".
+// ParseCondition parses a condition string like "age > 30" or "name == bob".
+// The operator must be one of: ==, !=, <=, >=, <, >, ~=, in.
 func ParseCondition(s string) (Condition, error) {
 	re := regexp.MustCompile(`^(\w+)\s*(==|!=|<=|>=|<|>|~=|in)\s*(.+)$`)
 	matches := re.FindStringSubmatch(s)

@@ -1,3 +1,5 @@
+// Package shell implements the core BakShell REPL: input, tokenization,
+// command chaining (&&/||/;/&), alias expansion, plugin dispatch, and timing.
 package shell
 
 import (
@@ -16,6 +18,8 @@ import (
 	"github.com/chzyer/readline"
 )
 
+// Shell holds the persistent state for the shell session: config, plugins,
+// environment info, aliases, and the undo buffer.
 type Shell struct {
 	home        string
 	cfg         *config.Config
@@ -25,9 +29,11 @@ type Shell struct {
 	promptColor string
 	lastExit    int
 	aliases     map[string]string
-	undoTable   *data.TableValue // saved table state for undo
+	undoTable   *data.TableValue // saved table state for the 'undo' command
 }
 
+// New initializes the shell: determines the user/home, creates ~/.bshc/
+// if missing, loads the Lua config, and starts up the plugin manager.
 func New() (*Shell, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
@@ -50,8 +56,8 @@ func New() (*Shell, error) {
 		aliases: make(map[string]string),
 	}
 
-	// Init config dirs
-	configDir := home + "/.zencr"
+	// Ensure ~/.bshc/ and ~/.bshc/plugins/ exist
+	configDir := home + "/.bshc"
 	pluginDir := configDir + "/plugins"
 	for _, d := range []string{configDir, pluginDir} {
 		if _, err := os.Stat(d); os.IsNotExist(err) {
@@ -59,7 +65,7 @@ func New() (*Shell, error) {
 		}
 	}
 
-	// Init Lua + load config
+	// Load Lua config (falls back to defaults if missing)
 	s.plugins = plugins.New()
 	cfg, err := s.plugins.LoadConfig(configDir + "/config.lua")
 	if err != nil {
@@ -69,12 +75,14 @@ func New() (*Shell, error) {
 	s.cfg = cfg
 	s.promptColor = cfg.Theme.PromptColor
 
-	// Load plugins
+	// Load active Lua plugins
 	s.plugins.LoadPlugins(pluginDir, cfg.Plugins)
 
 	return s, nil
 }
 
+// Run enters the REPL loop: prints the prompt, reads a line, tokenizes,
+// executes the pipeline, and prints command timing for slow commands (>100ms).
 func (s *Shell) Run() int {
 	histSize := s.cfg.Settings.HistorySize
 	if histSize <= 0 {
@@ -83,7 +91,7 @@ func (s *Shell) Run() int {
 
 	rl, err := readline.NewEx(&readline.Config{
 		Prompt:            "",
-		HistoryFile:       s.home + "/.zencr/history",
+		HistoryFile:       s.home + "/.bshc/history",
 		HistoryLimit:      histSize,
 		AutoComplete:      s,
 		InterruptPrompt:   "^C",
@@ -96,7 +104,7 @@ func (s *Shell) Run() int {
 	defer rl.Close()
 	defer s.plugins.Close()
 
-	// SIGINT handler
+	// Handle SIGINT gracefully (no stack trace, just a reminder)
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT)
 	go func() {
@@ -113,7 +121,7 @@ func (s *Shell) Run() int {
 
 		line, err := rl.Readline()
 		if err != nil {
-			break
+			break // EOF (Ctrl+D) or error
 		}
 
 		// Multi-line continuation for unclosed quotes / trailing backslash
@@ -137,6 +145,7 @@ func (s *Shell) Run() int {
 			start := time.Now()
 			s.execute(args)
 			elapsed := time.Since(start)
+			// Print dimmed timing for commands slower than 100ms
 			if elapsed > 100*time.Millisecond {
 				fmt.Fprintf(os.Stderr, "\033[2m(%s)\033[0m\n", elapsed.Round(time.Millisecond))
 			}
@@ -146,21 +155,25 @@ func (s *Shell) Run() int {
 	return 0
 }
 
+// connector represents the chaining operator between command groups.
 type connector int
 
 const (
-	connSemi connector = iota
-	connAnd
-	connOr
-	connBg
-	connEnd
+	connSemi connector = iota // ;
+	connAnd                   // &&
+	connOr                    // ||
+	connBg                    // &  (background)
+	connEnd                   // end of input (no next group)
 )
 
+// segGroup is a group of piped commands joined by a chaining operator.
 type segGroup struct {
 	cmds []command
 	next connector
 }
 
+// execute parses the tokenized input into groups, expands aliases, and
+// runs each group with short-circuit semantics for &&/||.
 func (s *Shell) execute(args []string) {
 	if len(args) == 0 {
 		return
@@ -172,7 +185,7 @@ func (s *Shell) execute(args []string) {
 	}
 
 	groups := parseGroups(args)
-	var skip bool
+	var skip bool // skip remaining groups after a failed && or successful ||
 
 	for _, grp := range groups {
 		if len(grp.cmds) == 0 {
@@ -204,7 +217,7 @@ func (s *Shell) execute(args []string) {
 	s.plugins.SetExitCode(s.lastExit)
 }
 
-// isOperator returns true if tok is a shell operator (not a command name).
+// isOperator reports whether a token is a shell control operator.
 func isOperator(tok string) bool {
 	switch tok {
 	case ";", "&&", "||", "&", "|":
@@ -213,6 +226,7 @@ func isOperator(tok string) bool {
 	return false
 }
 
+// builtinNames is the set of all built-in commands (used for dispatch).
 var builtinNames = map[string]bool{
 	"cd": true, "exit": true, "quit": true, "echo": true,
 	"pwd": true, "type": true, "export": true, "unset": true,
@@ -223,6 +237,8 @@ var builtinNames = map[string]bool{
 	"first": true, "last": true, "count": true, "uniq": true, "table": true,
 }
 
+// expandAliases performs one round of alias expansion on command segments.
+// Aliases are expanded at the start of each segment (after operators).
 func (s *Shell) expandAliases(tokens []string) []string {
 	if len(s.aliases) == 0 {
 		return tokens
@@ -244,6 +260,8 @@ func (s *Shell) expandAliases(tokens []string) []string {
 	return result
 }
 
+// parseGroups splits a token list into command groups separated by
+// chaining operators (;, &&, ||, &).
 func parseGroups(tokens []string) []segGroup {
 	var groups []segGroup
 	start := 0
@@ -280,9 +298,12 @@ func parseGroups(tokens []string) []segGroup {
 	return groups
 }
 
+// generatePrompt builds the prompt string: either from a Lua plugin's
+// get_prompt() or from the theme config with standard specifiers.
 func (s *Shell) generatePrompt() string {
 	if p := s.plugins.GetPrompt(); p != "" {
-		// Multi-line prompts: print status lines, return only the last line for readline
+		// Multi-line prompts: print status lines to stdout, return only
+		// the last line for readline's prompt.
 		if idx := strings.LastIndex(p, "\n"); idx >= 0 {
 			fmt.Print(p[:idx+1])
 			return p[idx+1:]

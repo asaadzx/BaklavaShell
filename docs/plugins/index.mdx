@@ -1,11 +1,11 @@
 # Plugin Overview
 
-Plugins are Lua scripts that hook into the shell through global functions. They live in `~/.zencr/plugins/` and are enabled by name in `~/.zencr/config.lua`.
+Plugins are Lua scripts that hook into the shell through global functions. They live in `~/.bshc/plugins/` and are enabled by name in `~/.bshc/config.lua`.
 
 ## How they load
 
 1. The shell reads the `plugins` table from config.lua
-2. For each filename, it runs `luaL_dofile("~/.zencr/plugins/<name>")`
+2. For each filename, it runs `luaL_dofile("~/.bshc/plugins/<name>")`
 3. After all plugins load, the shell looks for two globals and caches their references:
    - `execute_command` — called before every command
    - `get_prompt` — called before every prompt
@@ -22,7 +22,7 @@ All plugins share one Lua state. Only the last definition of each global functio
 
 ## Quick example
 
-`~/.zencr/plugins/hello.lua`:
+`~/.bshc/plugins/hello.lua`:
 
 ```lua
 function execute_command(args)

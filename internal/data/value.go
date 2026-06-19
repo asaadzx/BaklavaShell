@@ -1,3 +1,9 @@
+// Package data provides a structured data type system for the shell's
+// data pipeline (from-json, where, sort-by, select, etc.).
+//
+// Value types: String, Int, Float, Bool, List, Record, Table.
+// Tables are column-oriented and support filtering, sorting, projection,
+// aggregation, grouping, and uniqueness operations.
 package data
 
 import (
@@ -7,6 +13,7 @@ import (
 	"strings"
 )
 
+// Kind enumerates the supported value types.
 type Kind int
 
 const (
@@ -40,6 +47,7 @@ func (k Kind) String() string {
 	}
 }
 
+// Value is the interface for all structured data values.
 type Value interface {
 	Kind() Kind
 	String() string
@@ -47,6 +55,7 @@ type Value interface {
 	Compare(op string, other Value) (bool, error)
 }
 
+// StringValue wraps a Go string.
 type StringValue struct{ Value string }
 
 func (v StringValue) Kind() Kind          { return KindString }
@@ -54,6 +63,7 @@ func (v StringValue) String() string       { return v.Value }
 func (v StringValue) Display() string      { return v.Value }
 func (v StringValue) GoString() string     { return fmt.Sprintf("%q", v.Value) }
 
+// Compare supports ==, !=, <, <=, >, >=, ~= (regex match), and in (list only).
 func (v StringValue) Compare(op string, other Value) (bool, error) {
 	s2, ok := other.(StringValue)
 	if !ok {
@@ -85,12 +95,14 @@ func (v StringValue) Compare(op string, other Value) (bool, error) {
 	}
 }
 
+// IntValue wraps a Go int64.
 type IntValue struct{ Value int64 }
 
 func (v IntValue) Kind() Kind          { return KindInt }
 func (v IntValue) String() string       { return strconv.FormatInt(v.Value, 10) }
 func (v IntValue) Display() string      { return strconv.FormatInt(v.Value, 10) }
 
+// Compare supports ==, !=, <, <=, >, >= against IntValue and FloatValue.
 func (v IntValue) Compare(op string, other Value) (bool, error) {
 	switch o := other.(type) {
 	case IntValue:
@@ -133,12 +145,14 @@ func (v IntValue) Compare(op string, other Value) (bool, error) {
 	}
 }
 
+// FloatValue wraps a Go float64.
 type FloatValue struct{ Value float64 }
 
 func (v FloatValue) Kind() Kind          { return KindFloat }
 func (v FloatValue) String() string       { return strconv.FormatFloat(v.Value, 'f', -1, 64) }
 func (v FloatValue) Display() string      { return strconv.FormatFloat(v.Value, 'f', 2, 64) }
 
+// Compare supports ==, !=, <, <=, >, >= against FloatValue and IntValue.
 func (v FloatValue) Compare(op string, other Value) (bool, error) {
 	switch o := other.(type) {
 	case FloatValue:
@@ -182,12 +196,14 @@ func (v FloatValue) Compare(op string, other Value) (bool, error) {
 	}
 }
 
+// BoolValue wraps a Go bool.
 type BoolValue struct{ Value bool }
 
 func (v BoolValue) Kind() Kind          { return KindBool }
 func (v BoolValue) String() string       { return strconv.FormatBool(v.Value) }
 func (v BoolValue) Display() string      { return strconv.FormatBool(v.Value) }
 
+// Compare supports == and != against another BoolValue.
 func (v BoolValue) Compare(op string, other Value) (bool, error) {
 	o, ok := other.(BoolValue)
 	if !ok {
@@ -203,6 +219,7 @@ func (v BoolValue) Compare(op string, other Value) (bool, error) {
 	}
 }
 
+// ListValue is an ordered list of Values. Supports the "in" operator.
 type ListValue struct{ Values []Value }
 
 func (v ListValue) Kind() Kind  { return KindList }
@@ -215,6 +232,7 @@ func (v ListValue) String() string {
 }
 func (v ListValue) Display() string { return v.String() }
 
+// Compare supports "in" (checks if other is in the list).
 func (v ListValue) Compare(op string, other Value) (bool, error) {
 	switch op {
 	case "in":
@@ -233,14 +251,13 @@ func (v ListValue) Compare(op string, other Value) (bool, error) {
 	}
 }
 
+// RecordValue is a map of field names to Values. Used as a row in a table.
 type RecordValue struct {
 	Fields map[string]Value
 }
 
 func (v RecordValue) Kind() Kind  { return KindRecord }
-func (v RecordValue) String() string {
-	return v.Display()
-}
+func (v RecordValue) String() string { return v.Display() }
 func (v RecordValue) Display() string {
 	parts := make([]string, 0, len(v.Fields))
 	for k, val := range v.Fields {
@@ -252,6 +269,7 @@ func (v RecordValue) Compare(op string, other Value) (bool, error) {
 	return false, fmt.Errorf("cannot compare records directly")
 }
 
+// TableValue is a column-oriented dataset with named columns and rows.
 type TableValue struct {
 	Columns []string
 	Rows    []RecordValue
@@ -263,28 +281,19 @@ func (v TableValue) String() string {
 		return "(empty table)"
 	}
 	var b strings.Builder
-	// Header
 	for i, col := range v.Columns {
-		if i > 0 {
-			b.WriteString("  ")
-		}
+		if i > 0 { b.WriteString("  ") }
 		b.WriteString(col)
 	}
 	b.WriteString("\n")
-	// Separator
 	for i := range v.Columns {
-		if i > 0 {
-			b.WriteString("  ")
-		}
+		if i > 0 { b.WriteString("  ") }
 		b.WriteString(strings.Repeat("-", len(v.Columns[i])))
 	}
 	b.WriteString("\n")
-	// Rows
 	for _, row := range v.Rows {
 		for i, col := range v.Columns {
-			if i > 0 {
-				b.WriteString("  ")
-			}
+			if i > 0 { b.WriteString("  ") }
 			if val, ok := row.Fields[col]; ok {
 				b.WriteString(val.Display())
 			} else {
@@ -300,7 +309,7 @@ func (v TableValue) Compare(op string, other Value) (bool, error) {
 	return false, fmt.Errorf("cannot compare tables directly")
 }
 
-// ParseValue attempts to parse a string into the best matching Value type.
+// ParseValue attempts to parse s as bool, int, float, or falls back to string.
 func ParseValue(s string) Value {
 	if s == "" {
 		return StringValue{Value: s}

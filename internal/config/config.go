@@ -1,24 +1,32 @@
+// Package config parses ~/.bshc/config.lua into a Config struct.
+//
+// The Lua config file assigns to global tables: plugins, theme, settings.
+// All fields are optional; missing fields use defaults from Default().
 package config
 
 import lua "github.com/yuin/gopher-lua"
 
+// Config holds the parsed shell configuration from Lua.
 type Config struct {
 	Plugins  []string
 	Theme    ThemeConfig
 	Settings SettingsConfig
 }
 
+// ThemeConfig controls the prompt appearance.
 type ThemeConfig struct {
-	PromptColor  string
-	Background   string
-	PromptFormat string
+	PromptColor  string // hex color for the prompt text
+	Background   string // hex color for the terminal background
+	PromptFormat string // format string with %u/%h/%d/%t/%T/%?/%$ specifiers
 }
 
+// SettingsConfig controls shell behavior.
 type SettingsConfig struct {
 	HistorySize  int
 	AutoComplete bool
 }
 
+// Default returns a Config with sensible defaults.
 func Default() *Config {
 	return &Config{
 		Theme: ThemeConfig{
@@ -33,6 +41,8 @@ func Default() *Config {
 	}
 }
 
+// LoadFromLua executes a Lua config file and extracts the plugins, theme,
+// and settings tables. Returns defaults for any missing table or field.
 func LoadFromLua(L *lua.LState, path string) (*Config, error) {
 	cfg := Default()
 
