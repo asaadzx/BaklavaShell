@@ -112,9 +112,11 @@ func (s *Shell) Do(line []rune, pos int) ([][]rune, int) {
 	}
 
 	sort.Strings(candidates)
+	preRunes := []rune(prefix)
 	completions := make([][]rune, len(candidates))
 	for i, c := range candidates {
-		completions[i] = []rune(c)
+		cRunes := []rune(c)
+		completions[i] = cRunes[len(preRunes):]
 	}
-	return completions, len([]rune(prefix))
+	return completions, len(preRunes)
 }
