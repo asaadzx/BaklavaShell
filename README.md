@@ -26,6 +26,15 @@
 
 ## Quickstart
 
+### Install via apt (Debian/Ubuntu)
+
+```sh
+curl -1sLf 'https://dl.cloudsmith.io/public/workspace-for-asaad/debian-ya9a/setup.deb.sh' | sudo -E bash
+sudo apt-get install bsh
+```
+
+### Build from source
+
 ```sh
 go build -ldflags="-s -w" -o bsh ./cmd/bsh
 ./bsh
